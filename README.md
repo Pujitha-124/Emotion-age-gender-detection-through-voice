@@ -1,1 +1,1 @@
-# AI-project
+# Audio based emotions detection 
