@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audio Classifier</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Reset */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body, html {
+      height: 100%;
+      width: 100%;
+      font-family: 'Poppins', sans-serif;
+      overflow: hidden;
+      background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
+      position: relative;
+    }
+
+    /* Title Section */
+    .title-section {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 20px 0;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+    }
+    .title-section h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 26px;
+      color: #ffffff;
+      font-weight: 600;
+      text-shadow: 1px 1px 5px rgba(0,0,0,0.2);
+    }
+
+    /* Upload Section */
+    .upload-section {
+      position: absolute;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      z-index: 10;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    label, button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid white;
+      padding: 12px 24px;
+      border-radius: 999px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(6px);
+    }
+    label:hover, button:hover {
+      background: white;
+      color: #66a6ff;
+      border-color: #66a6ff;
+      transform: scale(1.05);
+    }
+
+    /* Recording Section */
+    .recording-section {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      z-index: 10;
+    }
+    .recording-section button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid white;
+      padding: 12px 24px;
+      border-radius: 999px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(6px);
+    }
+    .recording-section button:hover {
+      background: white;
+      color: #66a6ff;
+      border-color: #66a6ff;
+      transform: scale(1.05);
+    }
+    .recording-section audio {
+      width: 200px;
+    }
+
+    /* Prediction Card */
+    .prediction-card {
+      position: absolute;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      backdrop-filter: blur(6px);
+    }
+    .prediction-card p {
+      font-size: 18px;
+      color: #333;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Title Section -->
+  <div class="title-section">
+    <h1>Audio-based Age, Gender & Emotion Detection</h1>
+  </div>
+
+  <!-- Upload Buttons -->
+  <form method="POST" enctype="multipart/form-data" class="upload-section" id="uploadForm">
+    <input type="file" id="fileUpload" name="file" accept="audio/*" required>
+    <label for="fileUpload">Choose File</label>
+    <button type="submit">Upload</button>
+  </form>
+
+  <!-- Recording Section -->
+  <div class="recording-section">
+    <button id="startRecording">Start Recording</button>
+    <button id="stopRecording" disabled>Stop Recording</button>
+    <audio id="audioPreview" controls></audio>
+  </div>
+
+  <!-- Prediction Card -->
+  {% if result %}
+  <div class="prediction-card show">
+    <p><strong>Gender:</strong> {{ result.gender }} </p>
+    <p><strong>Age:</strong> {{ result.age }}</p>
+    <p><strong>Emotion:</strong> {{ result.emotion }}</p>
+  </div>
+  {% endif %}
+
+  <script>
+    let mediaRecorder;
+    let audioChunks = [];
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          document.getElementById('audioPreview').src = audioUrl;
+
+          const formData = new FormData();
+          formData.append('file', audioBlob, 'recording.wav');
+
+          fetch('/', {
+            method: 'POST',
+            body: formData,
+          })
+            .then((response) => response.text())
+            .then((html) => {
+              document.open();
+              document.write(html);
+              document.close();
+            });
+
+          audioChunks = [];
+        };
+
+        mediaRecorder.start();
+        document.getElementById('startRecording').disabled = true;
+        document.getElementById('stopRecording').disabled = false;
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+        alert('Microphone access denied or unavailable.');
+      }
+    }
+
+    function stopRecording() {
+      mediaRecorder.stop();
+      document.getElementById('startRecording').disabled = false;
+      document.getElementById('stopRecording').disabled = true;
+    }
+
+    document.getElementById('startRecording').addEventListener('click', startRecording);
+    document.getElementById('stopRecording').addEventListener('click', stopRecording);
+  </script>
+
+</body>
+</html>
